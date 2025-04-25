@@ -177,6 +177,9 @@ line_width = [2.0]  # Line thickness
 disp_time=.1
 curtime=0
 my_world.reset()
+direction = 1
+speed = 1
+
 while simulation_app.is_running():
     my_world.step(render=True)
     if my_world.is_playing():
@@ -214,18 +217,19 @@ while simulation_app.is_running():
         CAMRGB=JBcam.get_rgba()
         # print("Camera Frame:\n"+str(CAMFRAME['rgba']))
         # print("Camera Frame:\n"+str(CAMFRAME['rendering_frame']))
-        # print("Camera RGB:\n"+str(CAMRGB.shape))
+        #print("Camera RGB:\n"+str(CAMRGB.shape))
         #-----------PROCESS JB RGB Image-----------
-        red_areas=np.all([CAMRGB[:,:,0]>250,CAMRGB[:,:,1]<100,CAMRGB[:,:,2]<100],axis=0)
-        red_rows=np.argwhere(np.any(red_areas, axis=0))
-        red_size=len(red_rows)
+        red_areas=np.all([CAMRGB[:,:,0]>200,CAMRGB[:,:,1]<100,CAMRGB[:,:,2]<100],axis=0)
+        
+        red_cols=np.argwhere(np.any(red_areas, axis=0))
+        red_size=len(red_cols)
         red_loc=0
         if red_size>0:
-            red_loc=-1+max(red_rows)/64
+            red_loc=-1+max(red_cols)/64
         
 
         blue_areas=np.all([CAMRGB[:,:,2]>250,CAMRGB[:,:,0]<100,CAMRGB[:,:,1]<100],axis=0)
-        blue_rows=np.argwhere(np.any(red_areas, axis=0))
+        blue_rows=np.argwhere(np.any(blue_areas, axis=0))
         blue_size=len(blue_rows)
         # blue_centered=blue_rows-64*np.ones(len(blue_rows))
         # center_ind=np.where(blue_centered == blue_centered.min())
@@ -239,7 +243,7 @@ while simulation_app.is_running():
             # print(red_size)
             # if red_size>0:
             #     print(red_loc,"\n")
-        print(f"SIZE={red_size}\tLR={red_loc}")
+        #print(f"SIZE={red_size}\tLR={red_loc}")
         # #=========Draw Line=============
         # start_point = [(0,0,0)]  # Adjust these values for your desired start position
         # end_point = [(0,0,3)]  # Adjust these values for your desired end p
@@ -250,14 +254,19 @@ while simulation_app.is_running():
         position, orientation = JB.get_world_pose()
         # JB.apply_wheel_actions(JB_controller.forward(command=[1, np.pi]))
         
-        #JB.apply_wheel_actions(JB_controller.forward(command=[0, np.pi]))
-        #if red_size==0:
-        #    #JB.apply_wheel_actions(JB_controller.forward(command=[1, 0]))
-        #    #JB.apply_wheel_actions(JB_controller.forward(command=[0, np.pi]))
-        #else:
-        #    #JB.apply_wheel_actions(JB_controller.forward(command=[0, 0]))
+        # JB.apply_wheel_actions(JB_controller.forward(command=[0, np.pi]))
+        image_half_width = CAMRGB.shape[0]/2
+        if red_size > 0:
+            print(f"{red_cols=}")
+            mean_loc = np.mean(red_cols)
+            speed = abs(mean_loc-image_half_width)/image_half_width
+            if np.mean(red_cols) > image_half_width:
+                direction = -1
+            elif np.mean(red_cols) < image_half_width:
+                direction = 1
+        JB.apply_wheel_actions(JB_controller.forward(command=[0, direction* speed*np.pi]))
 
-        print(JB.get_angular_velocity())
+        #print(JB.get_angular_velocity())
         
         
         #=====================================END of RUNTIME======================================================
