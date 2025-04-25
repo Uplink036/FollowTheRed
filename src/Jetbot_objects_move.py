@@ -178,7 +178,7 @@ disp_time=.1
 curtime=0
 my_world.reset()
 direction = 1
-speed = 1
+turn_speed = 1
 
 while simulation_app.is_running():
     my_world.step(render=True)
@@ -256,15 +256,23 @@ while simulation_app.is_running():
         
         # JB.apply_wheel_actions(JB_controller.forward(command=[0, np.pi]))
         image_half_width = CAMRGB.shape[0]/2
+        box_width = 999
         if red_size > 0:
             print(f"{red_cols=}")
             mean_loc = np.mean(red_cols)
-            speed = abs(mean_loc-image_half_width)/image_half_width
+            turn_speed = abs(mean_loc-image_half_width)/image_half_width
             if np.mean(red_cols) > image_half_width:
                 direction = -1
             elif np.mean(red_cols) < image_half_width:
                 direction = 1
-        JB.apply_wheel_actions(JB_controller.forward(command=[0, direction* speed*np.pi]))
+
+            box_width = float(red_cols[-1]-red_cols[0])
+        
+        if box_width > image_half_width/2:
+            forward_speed = 0
+        else:
+            forward_speed = 1-(box_width/image_half_width)
+        JB.apply_wheel_actions(JB_controller.forward(command=[forward_speed/2, direction*turn_speed*2*np.pi]))
 
         #print(JB.get_angular_velocity())
         
