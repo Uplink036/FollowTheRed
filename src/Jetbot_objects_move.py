@@ -180,6 +180,27 @@ my_world.reset()
 direction = 1
 turn_speed = 1
 
+# format:
+# list of
+# (
+#   CAMRGB,
+#   forward_speed,
+#   turn_speed
+# )
+img_data_list = []
+
+import torch
+from model import get_model, get_image_transform
+
+model = get_model()
+preprocess = get_image_transform()
+
+loss = torch.nn.MSELoss()
+optimizer = torch.optim.Adam(model.children(), lr=0.001)
+
+gamma = 0.99
+epsilion = 0.0001 # Randomness
+
 while simulation_app.is_running():
     my_world.step(render=True)
     if my_world.is_playing():
@@ -255,24 +276,40 @@ while simulation_app.is_running():
         # JB.apply_wheel_actions(JB_controller.forward(command=[1, np.pi]))
         
         # JB.apply_wheel_actions(JB_controller.forward(command=[0, np.pi]))
-        image_half_width = CAMRGB.shape[0]/2
-        box_width = 999
-        if red_size > 0:
-            print(f"{red_cols=}")
-            mean_loc = np.mean(red_cols)
-            turn_speed = abs(mean_loc-image_half_width)/image_half_width
-            if np.mean(red_cols) > image_half_width:
-                direction = -1
-            elif np.mean(red_cols) < image_half_width:
-                direction = 1
+        if np.random.random() < gamma:
+            image_half_width = CAMRGB.shape[0]/2
+            box_width = 999
+            if red_size > 0:
+                print(f"{red_cols=}")
+                mean_loc = np.mean(red_cols)
+                turn_speed = abs(mean_loc-image_half_width)/image_half_width
+                if np.mean(red_cols) > image_half_width:
+                    direction = -1
+                elif np.mean(red_cols) < image_half_width:
+                    direction = 1
 
-            box_width = float(red_cols[-1]-red_cols[0])
-        
-        if box_width > image_half_width/2:
-            forward_speed = 0
+                box_width = float(red_cols[-1]-red_cols[0])
+            
+            if box_width > image_half_width/2:
+                forward_speed = 0
+            else:
+                forward_speed = 1-(box_width/image_half_width)
+            
+            model.zero_grad()
+            xy = model(preprocess(CAMRGB))
+            target = torch.tensor([forward_speed, turn_speed])
+            output = loss(xy, target)
+            output.backward()
+            optimizer.step()
         else:
-            forward_speed = 1-(box_width/image_half_width)
+            xy = model(preprocess(CAMRGB))
+            forward_speed = float(xy[0])
+            turn_speed = float(xy[1])
+
         JB.apply_wheel_actions(JB_controller.forward(command=[forward_speed/2, direction*turn_speed*2*np.pi]))
+
+        #img_data_list.append((CAMRGB, forward_speed, turn_speed))
+        gamma = gamma*(1-epsilion)
 
         #print(JB.get_angular_velocity())
         
