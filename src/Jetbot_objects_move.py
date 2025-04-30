@@ -196,7 +196,7 @@ model = get_model()
 preprocess = get_image_transform()
 
 loss = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(model.children(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 gamma = 0.99
 epsilion = 0.0001 # Randomness
@@ -280,7 +280,6 @@ while simulation_app.is_running():
             image_half_width = CAMRGB.shape[0]/2
             box_width = 999
             if red_size > 0:
-                print(f"{red_cols=}")
                 mean_loc = np.mean(red_cols)
                 turn_speed = abs(mean_loc-image_half_width)/image_half_width
                 if np.mean(red_cols) > image_half_width:
@@ -295,16 +294,29 @@ while simulation_app.is_running():
             else:
                 forward_speed = 1-(box_width/image_half_width)
             
-            model.zero_grad()
-            xy = model(preprocess(CAMRGB))
-            target = torch.tensor([forward_speed, turn_speed])
+            optimizer.zero_grad()
+            tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
+            tensor_rgb = tensor_rgb.permute(2, 0, 1)
+            tensor_rgb = tensor_rgb.float()
+            tensor_rgb = tensor_rgb / 255.0
+            tensor_rgb = tensor_rgb.unsqueeze(0)
+            preprocess_rgb = preprocess(tensor_rgb)
+            xy = model(preprocess_rgb)
+            target = torch.tensor([forward_speed, turn_speed], dtype=torch.float)
             output = loss(xy, target)
             output.backward()
             optimizer.step()
         else:
-            xy = model(preprocess(CAMRGB))
+            tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
+            tensor_rgb = tensor_rgb.permute(2, 0, 1)
+            tensor_rgb = tensor_rgb.float()
+            tensor_rgb = tensor_rgb / 255.0
+            tensor_rgb = tensor_rgb.unsqueeze(0)
+            xy = model(preprocess(tensor_rgb))
+            xy = xy[0]
             forward_speed = float(xy[0])
             turn_speed = float(xy[1])
+            print(f"Model action (G: {gamma})\n {forward_speed=} | {turn_speed=}")
 
         JB.apply_wheel_actions(JB_controller.forward(command=[forward_speed/2, direction*turn_speed*2*np.pi]))
 
