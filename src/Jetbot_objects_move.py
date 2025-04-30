@@ -191,15 +191,17 @@ img_data_list = []
 
 import torch
 from model import get_model, get_image_transform
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 model = get_model()
+model = model.to(DEVICE)
 preprocess = get_image_transform()
 
 loss = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 gamma = 0.99
-epsilion = 0.0001 # Randomness
+epsilion = 0.0001 
 
 while simulation_app.is_running():
     my_world.step(render=True)
@@ -296,18 +298,20 @@ while simulation_app.is_running():
             
             optimizer.zero_grad()
             tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
+            tensor_rgb = tensor_rgb.to(DEVICE)
             tensor_rgb = tensor_rgb.permute(2, 0, 1)
             tensor_rgb = tensor_rgb.float()
             tensor_rgb = tensor_rgb / 255.0
             tensor_rgb = tensor_rgb.unsqueeze(0)
             preprocess_rgb = preprocess(tensor_rgb)
             xy = model(preprocess_rgb)
-            target = torch.tensor([forward_speed, turn_speed], dtype=torch.float)
+            target = torch.tensor([forward_speed, turn_speed], dtype=torch.float, device=DEVICE)
             output = loss(xy, target)
             output.backward()
             optimizer.step()
         else:
             tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
+            tensor_rgb = tensor_rgb.to(DEVICE)
             tensor_rgb = tensor_rgb.permute(2, 0, 1)
             tensor_rgb = tensor_rgb.float()
             tensor_rgb = tensor_rgb / 255.0
