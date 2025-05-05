@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import sleep
 from model import get_model, get_image_transform
-
+from data import jetbotAction, modelStruct
 import omni
 import carb
 import omni.isaac
@@ -174,9 +174,10 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 model = get_model()
 model = model.to(DEVICE)
 preprocess = get_image_transform()
-
 loss = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+model_struct = modelStruct(model, loss, optimizer, preprocess)
 
 gamma = 0.99
 epsilion = 0.0001 
@@ -190,15 +191,15 @@ def image_to_tensor(CAMRGB):
     tensor_rgb = tensor_rgb.unsqueeze(0)
     return tensor_rgb
 
-def train(turn_speed, model, preprocess, loss, optimizer, image_to_tensor, CAMRGB, forward_speed):
-    optimizer.zero_grad()
+def train(action: jetbotAction, model_struct: modelStruct, CAMRGB):
+    model_struct.optimizer.zero_grad()
     tensor_rgb = image_to_tensor(DEVICE, CAMRGB)
-    preprocess_rgb = preprocess(tensor_rgb)
-    xy = model(preprocess_rgb)
-    target = torch.tensor([forward_speed, turn_speed], dtype=torch.float, device=DEVICE)
-    output = loss(xy, target)
+    preprocess_rgb = model_struct.preprocess(tensor_rgb)
+    xy = model_struct.model(preprocess_rgb)
+    target = torch.tensor([action.forward, action.turn], dtype=torch.float, device=DEVICE)
+    output = model_struct.loss(xy, target)
     output.backward()
-    optimizer.step()
+    model_struct.optimizer.step()
 
 while simulation_app.is_running():
     my_world.step(render=True)
@@ -263,23 +264,23 @@ while simulation_app.is_running():
                     direction = 1
 
                 box_width = float(red_cols[-1]-red_cols[0])
-            
             if box_width > image_half_width/2:
                 forward_speed = 0
             else:
                 forward_speed = 1-(box_width/image_half_width)
-            
-            train(turn_speed, DEVICE, model, preprocess, loss, optimizer, image_to_tensor, CAMRGB, forward_speed)
+
+            action = jetbotAction(forward_speed, turn_speed)
+            train(action, model_struct, CAMRGB)
+            print(f"Algorithm action (G: {gamma})\n {action.forward=} | {action.turn=}")
         else:
             tensor_rgb = image_to_tensor(DEVICE, CAMRGB)
             with torch.no_grad():
-                action = model(preprocess(tensor_rgb))
-                action = action[0]
-            forward_speed = float(action[0])
-            turn_speed = float(action[0])
-            print(f"Model action (G: {gamma})\n {forward_speed=} | {turn_speed=}")
+                pred_action = model_struct.model(model_struct.preprocess(tensor_rgb))
+                pred_action = pred_action[0] # Does not give out an direction...
+            action = jetbotAction(float(pred_action[0]), float(pred_action[0]))
+            print(f"Model action (G: {gamma})\n {action.forward=} | {action.turn=}")
 
-        JB.apply_wheel_actions(JB_controller.forward(command=[forward_speed/2, direction*turn_speed*2*np.pi]))
+        JB.apply_wheel_actions(JB_controller.forward(command=[action.forward/2, direction*action.turn*2*np.pi]))
 
         #=====================================END of RUNTIME======================================================
         if my_world.current_time_step_index == 0:
