@@ -1,16 +1,14 @@
 
 #=========================import Python libs========================
 import os
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
-
 from time import sleep
-#sleep(0.05)
-
+from model import get_model, get_image_transform
+from data import jetbotAction, modelStruct
 import omni
 import carb
-
-#Start ISaac SIM with GUI
 import omni.isaac
 from omni.isaac.kit import SimulationApp
 # import omni.isaac.utils
@@ -25,8 +23,6 @@ CONFIG = {
     # "display_options": 3286,  # Set display options to show default grid
 }
 simulation_app = SimulationApp(CONFIG)
-# simulation_app = SimulationApp({"headless": False, "additional_args": ["--/app/window/maximized=true"]})
-# simulation_app = SimulationApp({"headless": False, "additional_args": ["--/app/window/resizable=true","--/app/window/maximized=true"]})
 simulation_app._wait_for_viewport()
 
 # import omni.isaac.core.utils.stage
@@ -36,14 +32,8 @@ simulation_app._wait_for_viewport()
 
 #=========================Import OMNI Libraries=============================
 import omni
-from pxr import Usd, UsdGeom
 import omni.usd
 from omni.isaac.core import World
-# import random
-# import omni.isaac.debug_draw as debug_draw
-#from omni.isaac.debug_draw import _debug_draw
-# draw = _debug_draw.acquire_debug_draw_interface()
-# import random
 
 from omni.isaac.core.objects import DynamicCuboid, VisualCuboid
 from omni.isaac.core.utils.nucleus import get_assets_root_path
@@ -53,6 +43,7 @@ from omni.isaac.wheeled_robots.robots import WheeledRobot
 from omni.isaac.sensor import Camera
 from omni.isaac.core.utils import prims
 from omni.isaac.core.articulations import Articulation
+from pxr import Usd, UsdGeom
 
 
 #=========================SETUP world======================
@@ -153,9 +144,6 @@ for i in range(Nobj):
     )
     )
 #=================Initiate Obstacles Movement=====================
-# curtime=0
-# movdim=0
-# movdir=0
 minmovestep=.001
 maxmovestep=.05
 minmovedur=1 #Moving duration
@@ -172,7 +160,6 @@ start_point = [(0,0,0)]  # Adjust these values for your desired start position
 end_point = [(0,0,3)]  # Adjust these values for your desired end p
 line_color = [(1.0, 0.0, 0.0, 1.0)]  # Red color (RGBA format)
 line_width = [2.0]  # Line thickness
-#draw.draw_lines(start_point, end_point, line_color, line_width)
 #=====================START SIMULATION=====================
 disp_time=.1
 curtime=0
@@ -180,28 +167,39 @@ my_world.reset()
 direction = 1
 turn_speed = 1
 
-# format:
-# list of
-# (
-#   CAMRGB,
-#   forward_speed,
-#   turn_speed
-# )
 img_data_list = []
 
-import torch
-from model import get_model, get_image_transform
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 model = get_model()
 model = model.to(DEVICE)
 preprocess = get_image_transform()
-
 loss = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
+model_struct = modelStruct(model, loss, optimizer, preprocess)
+
 gamma = 0.99
 epsilion = 0.0001 
+
+def image_to_tensor(CAMRGB):
+    tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
+    tensor_rgb = tensor_rgb.to(DEVICE)
+    tensor_rgb = tensor_rgb.permute(2, 0, 1)
+    tensor_rgb = tensor_rgb.float()
+    tensor_rgb = tensor_rgb / 255.0
+    tensor_rgb = tensor_rgb.unsqueeze(0)
+    return tensor_rgb
+
+def train(action: jetbotAction, model_struct: modelStruct, CAMRGB):
+    model_struct.optimizer.zero_grad()
+    tensor_rgb = image_to_tensor(DEVICE, CAMRGB)
+    preprocess_rgb = model_struct.preprocess(tensor_rgb)
+    xy = model_struct.model(preprocess_rgb)
+    target = torch.tensor([action.forward, action.turn], dtype=torch.float, device=DEVICE)
+    output = model_struct.loss(xy, target)
+    output.backward()
+    model_struct.optimizer.step()
 
 while simulation_app.is_running():
     my_world.step(render=True)
@@ -209,7 +207,6 @@ while simulation_app.is_running():
         if my_world.current_time_step_index == 0:
             my_world.reset()
             JB_controller.reset()
-        # print('step'+str(my_world.current_time_step_index)+' time=' + str(my_world.current_time) + '\n')
         #=====================================RUNTIME======================================================
         #---------Move Obstacles------------
         for i in range(Nobj):
@@ -220,7 +217,6 @@ while simulation_app.is_running():
                 OBJ_movedurs[i]=np.random.rand()*(maxmovedur-minmovedur)+minmovedur
                 OBJ_movedims[i]=np.random.randint(2)#X or Y
                 OBJ_movedirs[i]=2*np.random.randint(2)-1#increase/decrease
-                # print("Changing direction: \n")
             #----------MOVE positions-------------
             pos=OBJ[i].get_world_pose()[0]  
             OBJ_pos[i]=pos
@@ -238,9 +234,6 @@ while simulation_app.is_running():
         #-------------GET JB Camera----------------
         CAMFRAME=JBcam.get_current_frame()
         CAMRGB=JBcam.get_rgba()
-        # print("Camera Frame:\n"+str(CAMFRAME['rgba']))
-        # print("Camera Frame:\n"+str(CAMFRAME['rendering_frame']))
-        #print("Camera RGB:\n"+str(CAMRGB.shape))
         #-----------PROCESS JB RGB Image-----------
         red_areas=np.all([CAMRGB[:,:,0]>200,CAMRGB[:,:,1]<100,CAMRGB[:,:,2]<100],axis=0)
         
@@ -249,35 +242,16 @@ while simulation_app.is_running():
         red_loc=0
         if red_size>0:
             red_loc=-1+max(red_cols)/64
-        
 
         blue_areas=np.all([CAMRGB[:,:,2]>250,CAMRGB[:,:,0]<100,CAMRGB[:,:,1]<100],axis=0)
         blue_rows=np.argwhere(np.any(blue_areas, axis=0))
         blue_size=len(blue_rows)
-        # blue_centered=blue_rows-64*np.ones(len(blue_rows))
-        # center_ind=np.where(blue_centered == blue_centered.min())
-        # blue_diffs=[1]+np.diff(blue_rows)
-        # center_starts=np.where(blue_diffs>2)
-        # center_starts=center_starts-center_ind*np.ones(len(center_starts))
-        # blue_srart=
 
         if my_world.current_time>curtime:
             curtime=my_world.current_time+disp_time
-            # print(red_size)
-            # if red_size>0:
-            #     print(red_loc,"\n")
-        #print(f"SIZE={red_size}\tLR={red_loc}")
-        # #=========Draw Line=============
-        # start_point = [(0,0,0)]  # Adjust these values for your desired start position
-        # end_point = [(0,0,3)]  # Adjust these values for your desired end p
-        # line_color = [(1.0, 0.0, 0.0, 1.0)]  # Red color (RGBA format)
-        # line_width = [2.0]  # Line thickness
-        # draw.draw_lines(start_point, end_point, line_color, line_width)
         #----------------JETBOT Movement---------------
         position, orientation = JB.get_world_pose()
-        # JB.apply_wheel_actions(JB_controller.forward(command=[1, np.pi]))
-        
-        # JB.apply_wheel_actions(JB_controller.forward(command=[0, np.pi]))
+
         if np.random.random() < gamma:
             image_half_width = CAMRGB.shape[0]/2
             box_width = 999
@@ -290,49 +264,28 @@ while simulation_app.is_running():
                     direction = 1
 
                 box_width = float(red_cols[-1]-red_cols[0])
-            
             if box_width > image_half_width/2:
                 forward_speed = 0
             else:
                 forward_speed = 1-(box_width/image_half_width)
-            
-            optimizer.zero_grad()
-            tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
-            tensor_rgb = tensor_rgb.to(DEVICE)
-            tensor_rgb = tensor_rgb.permute(2, 0, 1)
-            tensor_rgb = tensor_rgb.float()
-            tensor_rgb = tensor_rgb / 255.0
-            tensor_rgb = tensor_rgb.unsqueeze(0)
-            preprocess_rgb = preprocess(tensor_rgb)
-            xy = model(preprocess_rgb)
-            target = torch.tensor([forward_speed, turn_speed], dtype=torch.float, device=DEVICE)
-            output = loss(xy, target)
-            output.backward()
-            optimizer.step()
+
+            action = jetbotAction(forward_speed, turn_speed)
+            train(action, model_struct, CAMRGB)
+            print(f"Algorithm action (G: {gamma})\n {action.forward=} | {action.turn=}")
         else:
-            tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
-            tensor_rgb = tensor_rgb.to(DEVICE)
-            tensor_rgb = tensor_rgb.permute(2, 0, 1)
-            tensor_rgb = tensor_rgb.float()
-            tensor_rgb = tensor_rgb / 255.0
-            tensor_rgb = tensor_rgb.unsqueeze(0)
-            xy = model(preprocess(tensor_rgb))
-            xy = xy[0]
-            forward_speed = float(xy[0])
-            turn_speed = float(xy[1])
-            print(f"Model action (G: {gamma})\n {forward_speed=} | {turn_speed=}")
+            tensor_rgb = image_to_tensor(DEVICE, CAMRGB)
+            with torch.no_grad():
+                pred_action = model_struct.model(model_struct.preprocess(tensor_rgb))
+                pred_action = pred_action[0] # Does not give out an direction...
+            action = jetbotAction(float(pred_action[0]), float(pred_action[0]))
+            print(f"Model action (G: {gamma})\n {action.forward=} | {action.turn=}")
 
-        JB.apply_wheel_actions(JB_controller.forward(command=[forward_speed/2, direction*turn_speed*2*np.pi]))
+        JB.apply_wheel_actions(JB_controller.forward(command=[action.forward/2, direction*action.turn*2*np.pi]))
 
-        #img_data_list.append((CAMRGB, forward_speed, turn_speed))
-        gamma = gamma*(1-epsilion)
-
-        #print(JB.get_angular_velocity())
-        
-        
         #=====================================END of RUNTIME======================================================
         if my_world.current_time_step_index == 0:
             my_world.reset()
-            # my_controller.reset()
+
+        gamma = gamma*(1-epsilion)        
         observations = my_world.get_observations()
 simulation_app.close()
