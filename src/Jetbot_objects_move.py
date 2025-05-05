@@ -203,6 +203,25 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 gamma = 0.99
 epsilion = 0.0001 
 
+def image_to_tensor(DEVICE, CAMRGB):
+    tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
+    tensor_rgb = tensor_rgb.to(DEVICE)
+    tensor_rgb = tensor_rgb.permute(2, 0, 1)
+    tensor_rgb = tensor_rgb.float()
+    tensor_rgb = tensor_rgb / 255.0
+    tensor_rgb = tensor_rgb.unsqueeze(0)
+    return tensor_rgb
+
+def train(turn_speed, DEVICE, model, preprocess, loss, optimizer, image_to_tensor, CAMRGB, forward_speed):
+    optimizer.zero_grad()
+    tensor_rgb = image_to_tensor(DEVICE, CAMRGB)
+    preprocess_rgb = preprocess(tensor_rgb)
+    xy = model(preprocess_rgb)
+    target = torch.tensor([forward_speed, turn_speed], dtype=torch.float, device=DEVICE)
+    output = loss(xy, target)
+    output.backward()
+    optimizer.step()
+
 while simulation_app.is_running():
     my_world.step(render=True)
     if my_world.is_playing():
@@ -275,9 +294,7 @@ while simulation_app.is_running():
         # draw.draw_lines(start_point, end_point, line_color, line_width)
         #----------------JETBOT Movement---------------
         position, orientation = JB.get_world_pose()
-        # JB.apply_wheel_actions(JB_controller.forward(command=[1, np.pi]))
         
-        # JB.apply_wheel_actions(JB_controller.forward(command=[0, np.pi]))
         if np.random.random() < gamma:
             image_half_width = CAMRGB.shape[0]/2
             box_width = 999
@@ -296,43 +313,22 @@ while simulation_app.is_running():
             else:
                 forward_speed = 1-(box_width/image_half_width)
             
-            optimizer.zero_grad()
-            tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
-            tensor_rgb = tensor_rgb.to(DEVICE)
-            tensor_rgb = tensor_rgb.permute(2, 0, 1)
-            tensor_rgb = tensor_rgb.float()
-            tensor_rgb = tensor_rgb / 255.0
-            tensor_rgb = tensor_rgb.unsqueeze(0)
-            preprocess_rgb = preprocess(tensor_rgb)
-            xy = model(preprocess_rgb)
-            target = torch.tensor([forward_speed, turn_speed], dtype=torch.float, device=DEVICE)
-            output = loss(xy, target)
-            output.backward()
-            optimizer.step()
+            train(turn_speed, DEVICE, model, preprocess, loss, optimizer, image_to_tensor, CAMRGB, forward_speed)
         else:
-            tensor_rgb = torch.from_numpy(CAMRGB[:,:,0:3])
-            tensor_rgb = tensor_rgb.to(DEVICE)
-            tensor_rgb = tensor_rgb.permute(2, 0, 1)
-            tensor_rgb = tensor_rgb.float()
-            tensor_rgb = tensor_rgb / 255.0
-            tensor_rgb = tensor_rgb.unsqueeze(0)
-            xy = model(preprocess(tensor_rgb))
-            xy = xy[0]
-            forward_speed = float(xy[0])
-            turn_speed = float(xy[1])
+            tensor_rgb = image_to_tensor(DEVICE, CAMRGB)
+            with torch.no_grad():
+                action = model(preprocess(tensor_rgb))
+                action = action[0]
+            forward_speed = float(action[0])
+            turn_speed = float(action[0])
             print(f"Model action (G: {gamma})\n {forward_speed=} | {turn_speed=}")
 
         JB.apply_wheel_actions(JB_controller.forward(command=[forward_speed/2, direction*turn_speed*2*np.pi]))
 
-        #img_data_list.append((CAMRGB, forward_speed, turn_speed))
-        gamma = gamma*(1-epsilion)
-
-        #print(JB.get_angular_velocity())
-        
-        
         #=====================================END of RUNTIME======================================================
         if my_world.current_time_step_index == 0:
             my_world.reset()
-            # my_controller.reset()
+
+        gamma = gamma*(1-epsilion)        
         observations = my_world.get_observations()
 simulation_app.close()
