@@ -1,25 +1,18 @@
 import torch
-from torchvision.models import resnet18
-from torchvision import transforms as T
-
+from torchvision.models import resnet18, ResNet18_Weights
 
 def get_model():
-    model = resnet18(pretrained=True)
+    model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
     model.fc = torch.nn.Linear(512, 2)
     return model
 
-
 def get_image_transform():
-    preprocess = T.Compose(
-        [T.Resize(256),
-         T.CenterCrop(224)]
-    )
+    weights = ResNet18_Weights.DEFAULT
+    preprocess = weights.transforms()
     return preprocess
-
 
 if __name__ == "__main__":
     model = get_model()
     preprocess = get_image_transform()
     random_image = torch.rand((10, 3, 224, 224))
     print(model(preprocess(random_image)))
-
