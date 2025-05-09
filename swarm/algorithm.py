@@ -17,6 +17,9 @@ class BoxFollower():
 
         self.gamma = 0.99
         self.epsilion = 0.0001
+        
+        self.turn_speed = 0
+        self.forward_speed = 0
 
     def step(self, image) -> (float, float):
         if image is None:
@@ -34,7 +37,7 @@ class BoxFollower():
             box_width = 999
             if red_size > 0:
                 mean_loc = np.mean(red_cols)
-                turn_speed = abs(mean_loc-image_half_width)/image_half_width
+                self.turn_speed = abs(mean_loc-image_half_width)/image_half_width
                 if np.mean(red_cols) > image_half_width:
                     direction = -1
                 elif np.mean(red_cols) < image_half_width:
@@ -43,9 +46,9 @@ class BoxFollower():
                 box_width = float(red_cols[-1]-red_cols[0])
 
             if box_width > image_half_width/2:
-                forward_speed = 0
+                self.forward_speed = 0
             else:
-                forward_speed = 1-(box_width/image_half_width)
+                self.forward_speed = 1-(box_width/image_half_width)
 
             self.optimizer.zero_grad()
             tensor_rgb = torch.from_numpy(image[:, :, 0:3])
@@ -57,7 +60,7 @@ class BoxFollower():
             preprocess_rgb = self.preprocess(tensor_rgb)
 
             xy = self.model(preprocess_rgb)
-            target = torch.tensor([forward_speed, turn_speed],
+            target = torch.tensor([self.forward_speed, self.turn_speed],
                                   dtype=torch.float, device=self.DEVICE)
             output = self.loss(xy, target)
             output.backward()
@@ -71,10 +74,10 @@ class BoxFollower():
             tensor_rgb = tensor_rgb.unsqueeze(0)
             xy = self.model(self.preprocess(tensor_rgb))
             xy = xy[0]
-            forward_speed = float(xy[0])
-            turn_speed = float(xy[1])
+            self.forward_speed = float(xy[0])
+            self.turn_speed = float(xy[1])
 
-        # img_data_list.append((CAMRGB, forward_speed, turn_speed))
+        # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
         self.gamma = self.gamma*(1-self.epsilion)
 
-        return (forward_speed/2, direction*turn_speed*2*np.pi)
+        return (self.forward_speed/2, direction*self.turn_speed*2*np.pi)
