@@ -16,7 +16,6 @@ def get_image_transform():
     )
     return preprocess
 
-
 if __name__ == "__main__":
     model = get_model()
     preprocess = get_image_transform()
