@@ -80,4 +80,7 @@ class BoxFollower():
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
         self.gamma = self.gamma*(1-self.epsilion)
 
+        if self.DEVICE == "cuda":
+            torch.cuda.empty_cache()
+
         return (self.forward_speed/2, direction*self.turn_speed*2*np.pi)
