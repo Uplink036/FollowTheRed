@@ -52,6 +52,15 @@ def stop_robot(jetbot_ip):
     else:
         print("Failed to execute stop command")
 
+import json
+def get_state(jetbot_ip):
+    url = f'http://{jetbot_ip}:8080/state'
+    response = requests.get(url)
+    string_response = response.content.decode("utf-8")
+    dict_response = json.loads(string_response)
+    return dict_response
+    
+
 # Function to display continuous camera stream
 def display_camera_stream(jetbot_ip):
     while True:

@@ -1,8 +1,5 @@
-run: ## Run the python program
+simulation_run: ## Run the python program
 	python3 ./src/Jetbot_objects_move.py
-
-req: ## Install the requriments 
-	pip install -r requirements.txt
 
 issac:
 	python -m venv env_isaacsim
