@@ -32,6 +32,7 @@ class BoxFollower():
         red_cols = np.argwhere(np.any(red_areas, axis=0))
         red_size = len(red_cols)
 
+        tensor_rgb = self.numpy_to_tensor(image)
         if np.random.random() < self.gamma:
             image_half_width = image.shape[0]/2
             box_width = 999
@@ -53,22 +54,24 @@ class BoxFollower():
             tensor_rgb = self.numpy_to_tensor(image)
             self.train_model(tensor_rgb)
         else:
-            tensor_rgb = self.numpy_to_tensor(image)
             predection = self.predict(tensor_rgb)
             self.forward_speed = float(predection[0])
             self.turn_speed = float(predection[1])
             self.direction = 1
-
+        tensor_rgb.detach()
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
         self.gamma = self.gamma*(1-self.epsilion)
 
         if self.DEVICE == "cuda":
             torch.cuda.empty_cache()
+    
 
         return (self.forward_speed/2, self.direction*self.turn_speed*2*np.pi)
 
     def predict(self, tensor_rgb):
-        xy = self.model(self.preprocess(tensor_rgb))
+        with torch.no_grad():
+            self.model.eval()
+            xy = self.model(self.preprocess(tensor_rgb))
         xy = xy[0]
         return xy
 
@@ -82,6 +85,7 @@ class BoxFollower():
         output = self.loss(xy, target)
         output.backward()
         self.optimizer.step()
+        target.detach()
 
     def numpy_to_tensor(self, image):
         tensor_rgb = torch.from_numpy(image[:, :, 0:3])
