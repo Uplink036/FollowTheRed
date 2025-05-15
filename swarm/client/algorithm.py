@@ -20,6 +20,7 @@ class BoxFollower():
         
         self.turn_speed = 0
         self.forward_speed = 0
+        self.direction = 1
 
     def step(self, image) -> (float, float):
         if image is None:
@@ -39,9 +40,9 @@ class BoxFollower():
                 mean_loc = np.mean(red_cols)
                 self.turn_speed = abs(mean_loc-image_half_width)/image_half_width
                 if np.mean(red_cols) > image_half_width:
-                    direction = -1
+                    self.direction = -1
                 elif np.mean(red_cols) < image_half_width:
-                    direction = 1
+                    self.direction = 1
 
                 box_width = float(red_cols[-1]-red_cols[0])
 
@@ -60,7 +61,7 @@ class BoxFollower():
             preprocess_rgb = self.preprocess(tensor_rgb)
 
             xy = self.model(preprocess_rgb)
-            target = torch.tensor([self.forward_speed, self.turn_speed],
+            target = torch.tensor([self.forward_speed, direction*self.turn_speed],
                                   dtype=torch.float, device=self.DEVICE)
             output = self.loss(xy, target)
             output.backward()
@@ -76,6 +77,7 @@ class BoxFollower():
             xy = xy[0]
             self.forward_speed = float(xy[0])
             self.turn_speed = float(xy[1])
+            self.direction = 1
 
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
         self.gamma = self.gamma*(1-self.epsilion)
@@ -83,4 +85,4 @@ class BoxFollower():
         if self.DEVICE == "cuda":
             torch.cuda.empty_cache()
 
-        return (self.forward_speed/2, direction*self.turn_speed*2*np.pi)
+        return (self.forward_speed/2, self.direction*self.turn_speed*2*np.pi)
