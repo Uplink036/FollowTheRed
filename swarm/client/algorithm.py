@@ -61,7 +61,7 @@ class BoxFollower():
             preprocess_rgb = self.preprocess(tensor_rgb)
 
             xy = self.model(preprocess_rgb)
-            target = torch.tensor([self.forward_speed, direction*self.turn_speed],
+            target = torch.tensor([self.forward_speed, self.direction*self.turn_speed],
                                   dtype=torch.float, device=self.DEVICE)
             output = self.loss(xy, target)
             output.backward()
