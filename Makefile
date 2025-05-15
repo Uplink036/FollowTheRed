@@ -1,8 +1,8 @@
-run: ## Run the python program
-	python3 ./src/Jetbot_objects_move.py
+move: ## Run the swarm command
+	cd swarm & ./move.sh
 
-req: ## Install the requriments 
-	pip install -r requirements.txt
+simulation_run: ## Run the python program
+	python3 ./src/Jetbot_objects_move.py
 
 issac:
 	python -m venv env_isaacsim
