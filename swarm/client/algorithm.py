@@ -73,7 +73,13 @@ class BoxFollower():
             self.model.eval()
             xy = self.model(self.preprocess(tensor_rgb))
         xy = xy[0]
-        return xy
+        return xy  
+        
+    def save(self, PATH="weights.pth"):
+        torch.save(self.model.state_dict(), PATH)
+        
+    def load(self, PATH="weights.pth"):
+        self.model.load_state_dict(torch.load(PATH))
 
     def train_model(self, tensor_rgb):
         self.model.train()
