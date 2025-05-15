@@ -1,6 +1,3 @@
-move: ## Run the swarm command
-	cd swarm & ./move.sh
-
 simulation_run: ## Run the python program
 	python3 ./src/Jetbot_objects_move.py
 
