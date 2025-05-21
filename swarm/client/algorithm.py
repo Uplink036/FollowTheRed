@@ -74,6 +74,9 @@ class BoxFollower():
             xy = self.model(self.preprocess(tensor_rgb))
         xy = xy[0]
         return xy  
+    
+    def get_weights(self):
+        return self.model.state_dict()
         
     def save(self, PATH="weights.pth"):
         torch.save(self.model.state_dict(), PATH)
