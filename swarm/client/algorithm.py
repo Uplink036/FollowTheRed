@@ -82,7 +82,10 @@ class BoxFollower():
         torch.save(self.model.state_dict(), PATH)
         
     def load(self, PATH="weights.pth"):
-        self.model.load_state_dict(torch.load(PATH))
+        self.set_weights(torch.load(PATH))
+    
+    def set_weights(self, weights):
+        self.model.load_state_dict(weights)
 
     def train_model(self, tensor_rgb):
         self.model.train()

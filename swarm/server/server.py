@@ -76,6 +76,14 @@ def get_weights(jetbot_ip):
     dict_response = json.loads(string_response)
     return dict_response
     
+def set_weights(jetbot_ip, weights):
+    string_response = response.content.encode("utf-8")
+    params = {'weights': string_response}
+    url = f'http://{jetbot_ip}:8080/set_weights?{urlencode(params)}'
+    response = requests.get(url)
+    dict_response = json.loads(string_response)
+    return dict_response
+
 # Function to display continuous camera stream
 def display_camera_stream(jetbot_ip):
     while True:
@@ -84,12 +92,3 @@ def display_camera_stream(jetbot_ip):
         clear_output(wait=True)
         display(image)
         time.sleep(0.1) # Adjust the sleep time to control the frame rate
-
-# Example usage
-jetbot_ip = '194.47.156.22' # Replace with your Jetbot's IP address
-#set_motors(jetbot_ip, 0.3, 0)
-#move_left(jetbot_ip, 0.3)
-#move_right(jetbot_ip, 0.3)
-#move_forward(jetbot_ip, 0.3)
-#stop_robot(jetbot_ip)
-#display_camera_stream(jetbot_ip)
