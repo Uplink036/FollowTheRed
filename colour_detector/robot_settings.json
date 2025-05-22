@@ -1,0 +1,90 @@
+{
+	"settings":[
+		{
+			"colour":"red",
+			"bounds":[
+				{
+				"min": {
+					"hue":0,
+					"sat":88,
+					"val":85
+				},
+				"max":{
+					"hue":9,
+					"sat":255,
+					"val":255
+				}
+				}
+			]
+		},
+		{
+			"colour":"orange",
+			"bounds":[
+				{
+					"min": {
+						"hue":9,
+						"sat":116,
+						"val":136
+					},
+					"max":{
+						"hue":22,
+						"sat":255,
+						"val":255
+					}
+				}
+			]
+		},
+		{
+			"colour":"yellow",
+			"bounds":[
+				{
+					"min": {
+						"hue":18,
+						"sat":90,
+						"val":58
+					},
+					"max":{
+						"hue":30,
+						"sat":255,
+						"val":255
+					}
+				}
+			]
+		},
+		{
+			"colour":"blue",
+			"bounds":[
+				{
+					"min": {
+						"hue":97,
+						"sat":106,
+						"val":0
+					},
+					"max":{
+						"hue":108,
+						"sat":255,
+						"val":255
+					}
+				}
+			]
+		},
+		{
+			"colour":"pink",
+			"bounds":[
+				{
+				"min": {
+					"hue":168,
+					"sat":100,
+					"val":0
+				},
+				"max":{
+					"hue":177,
+					"sat":255,
+					"val":255
+				}
+				}
+			]
+		}
+	]
+}
+
