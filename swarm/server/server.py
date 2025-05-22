@@ -93,7 +93,7 @@ def set_weights(jetbot_ip, weights):
 
         headers = {
             'Content-Type': 'application/octet-stream',
-            'Content-Length': len(buffer)
+            'Content-Length': str(buffer.getbuffer().nbytes)
         }
 
         url = f'http://{jetbot_ip}:8080/set_weights'
