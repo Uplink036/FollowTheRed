@@ -3,9 +3,12 @@ from torchvision.models import resnet18
 from torchvision import transforms as T
 
 
-def get_model():
+def get_model(amount_of_colours=1):
     model = resnet18(pretrained=True)
-    model.fc = torch.nn.Linear(512, 2)
+    model.fc = torch.nn.Sequential(
+        torch.nn.Linear(512, 2*amount_of_colours),
+        torch.nn.Hardtanh()
+    )
     return model
 
 
