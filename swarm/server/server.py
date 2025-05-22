@@ -2,8 +2,19 @@ import requests
 from IPython.display import Image, display, clear_output
 import time
 from urllib.parse import urlencode
+import io 
+import torch 
 
 # Function to set motors
+def set_drive(jetbot_ip, forward, turning):
+    params = {'forward': forward, 'turn': turning}
+    url = f'http://{jetbot_ip}:8080/set_drive?{urlencode(params)}'
+    response = requests.get(url)
+    if response.status_code == 200:
+        print("Drive set successfully")
+    else:
+        print("Failed to set drive")   
+
 def set_motors(jetbot_ip, left_speed, right_speed):
     params = {'left': left_speed, 'right': right_speed}
     url = f'http://{jetbot_ip}:8080/set_motors?{urlencode(params)}'
@@ -60,6 +71,38 @@ def get_state(jetbot_ip):
     dict_response = json.loads(string_response)
     return dict_response
     
+def get_weights(jetbot_ip):
+    url = f'http://{jetbot_ip}:8080/get_weights'
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        try:
+            buffer = io.BytesIO(response.content)
+            state_dict = torch.load(buffer, map_location='cpu')
+            return state_dict
+        except Exception as e:
+            print("Failed to load torch weights:", str(e))
+            with open("bad_response.bin", "wb") as f:
+                f.write(response.content)
+            raise
+    else:
+        raise ValueError(f"HTTP error: {response.status_code}")
+    
+def set_weights(jetbot_ip, weights):
+        buffer = io.BytesIO()
+        torch.save(weights, buffer)
+
+        headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': len(buffer)
+        }
+
+        url = f'http://{jetbot_ip}:8080/set_weights'
+        response = requests.post(url, data=buffer.getvalue(), headers=headers)
+
+        if response.status_code == 200:
+            print("Set Weights command executed successfully")
+        else:
+            print("Failed to execute Set Weights command:", response.status_code)
 
 # Function to display continuous camera stream
 def display_camera_stream(jetbot_ip):
@@ -69,12 +112,3 @@ def display_camera_stream(jetbot_ip):
         clear_output(wait=True)
         display(image)
         time.sleep(0.1) # Adjust the sleep time to control the frame rate
-
-# Example usage
-jetbot_ip = '194.47.156.22' # Replace with your Jetbot's IP address
-#set_motors(jetbot_ip, 0.3, 0)
-#move_left(jetbot_ip, 0.3)
-#move_right(jetbot_ip, 0.3)
-#move_forward(jetbot_ip, 0.3)
-#stop_robot(jetbot_ip)
-#display_camera_stream(jetbot_ip)
