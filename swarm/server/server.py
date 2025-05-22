@@ -2,6 +2,8 @@ import requests
 from IPython.display import Image, display, clear_output
 import time
 from urllib.parse import urlencode
+import io 
+import torch 
 
 # Function to set motors
 def set_drive(jetbot_ip, forward, turning):
@@ -71,18 +73,36 @@ def get_state(jetbot_ip):
     
 def get_weights(jetbot_ip):
     url = f'http://{jetbot_ip}:8080/get_weights'
-    response = requests.get(url)
-    string_response = response.content.decode("utf-8")
-    dict_response = json.loads(string_response)
-    return dict_response
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        try:
+            buffer = io.BytesIO(response.content)
+            state_dict = torch.load(buffer, map_location='cpu')
+            return state_dict
+        except Exception as e:
+            print("Failed to load torch weights:", str(e))
+            with open("bad_response.bin", "wb") as f:
+                f.write(response.content)
+            raise
+    else:
+        raise ValueError(f"HTTP error: {response.status_code}")
     
 def set_weights(jetbot_ip, weights):
-    string_response = response.content.encode("utf-8")
-    params = {'weights': string_response}
-    url = f'http://{jetbot_ip}:8080/set_weights?{urlencode(params)}'
-    response = requests.get(url)
-    dict_response = json.loads(string_response)
-    return dict_response
+        buffer = io.BytesIO()
+        torch.save(weights, buffer)
+
+        headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': len(buffer)
+        }
+
+        url = f'http://{jetbot_ip}:8080/set_weights'
+        response = requests.post(url, data=buffer.getvalue(), headers=headers)
+
+        if response.status_code == 200:
+            print("Set Weights command executed successfully")
+        else:
+            print("Failed to execute Set Weights command:", response.status_code)
 
 # Function to display continuous camera stream
 def display_camera_stream(jetbot_ip):
