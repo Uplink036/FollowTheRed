@@ -1,4 +1,4 @@
-
+import cv2
 import numpy as np
 import torch
 import json
@@ -9,12 +9,6 @@ class BoxFollower():
     def __init__(self):
         self.gamma = 0.0001
         self.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = get_model()
-        self.model = self.model.to(self.DEVICE)
-        self.preprocess = get_image_transform()
-
-        self.loss = torch.nn.MSELoss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
         self.gamma = 0.99
         self.epsilion = 0.0001
@@ -26,7 +20,14 @@ class BoxFollower():
         with open("settings.json") as json_file:
             self.settings = json.load(json_file)
 
-        self.colours = [colour["colour"] for colour in settings]
+        self.colours = [colour["colour"] for colour in self.settings["settings"]]
+
+        self.model = get_model(len(self.colours))
+        self.model = self.model.to(self.DEVICE)
+        self.preprocess = get_image_transform()
+
+        self.loss = torch.nn.MSELoss()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
     def find_color_center(self, frame, hsv_bounds_list, min_area=5000):
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -81,10 +82,10 @@ class BoxFollower():
     def get_colour_centers(self, frame, settings):
         state = {}
         for setting in settings["settings"]:
-            bounds = get_bounds_from_setting(setting)
+            bounds = self.get_bounds_from_setting(setting)
             colour_name = setting["colour"]
 
-            center_norm_x, center_norm_y, found = find_color_center(frame, bounds, min_area=100)
+            center_norm_x, center_norm_y, found = self.find_color_center(frame, bounds, min_area=100)
 
             state[colour_name] = (center_norm_x, center_norm_y)
 
@@ -102,15 +103,16 @@ class BoxFollower():
 
         tensor_rgb = self.numpy_to_tensor(image)
         if np.random.random() < self.gamma:
-            result = get_colour_centers(image, self.settings)
+            result = self.get_colour_centers(image, self.settings)
             for colour in result:
-                decision.append((result[colour][0], result[colour][1]))
+                decision.append(result[colour][0])
+                decision.append(result[colour][1])
                 
             tensor_rgb = self.numpy_to_tensor(image)
-            self.train_model(tensor_rgb)
+            self.train_model(tensor_rgb, decision)
         else:
             predection = self.predict(tensor_rgb)
-            decision = prediction
+            decision = predection
         tensor_rgb.detach()
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
         self.gamma = self.gamma*(1-self.epsilion)
@@ -139,14 +141,13 @@ class BoxFollower():
     def set_weights(self, weights):
         self.model.load_state_dict(weights)
 
-    def train_model(self, tensor_rgb):
+    def train_model(self, tensor_rgb, target):
         self.model.train()
         self.optimizer.zero_grad()
         preprocess_rgb = self.preprocess(tensor_rgb)
-        xy = self.model(preprocess_rgb)
-        target = torch.tensor([self.forward_speed, self.direction*self.turn_speed],
-                                  dtype=torch.float, device=self.DEVICE)
-        output = self.loss(xy, target)
+        predection = self.model(preprocess_rgb)
+        target = torch.tensor(target, dtype=torch.float, device=self.DEVICE)
+        output = self.loss(predection, target)
         output.backward()
         self.optimizer.step()
         target.detach()
