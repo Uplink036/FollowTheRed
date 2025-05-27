@@ -116,11 +116,10 @@ class BoxFollower():
         else:
             method = "Model"
             predection = self.predict(tensor_rgb)
-            self.decision = predection
-
-            for i in range(len(self.decision)):
-                self.result[self.colours[i]] = self.decision[2*i]
-                self.result[self.colours[i]] = self.decision[2*i+1]
+            self.decision = predection.tolist()
+            for i in range(0, int(len(self.decision)/2)):
+                self.result[self.colours[i]] = (self.decision[2*i],
+                                                self.decision[2*i+1])
 
         tensor_rgb.detach()
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
