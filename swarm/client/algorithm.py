@@ -28,6 +28,9 @@ class BoxFollower():
 
         self.loss = torch.nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        
+        self.result = {}
+        self.decision = []
 
     def find_color_center(self, frame, hsv_bounds_list, min_area=5000):
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -99,28 +102,32 @@ class BoxFollower():
         if image is None:
             return (0, 0)
 
-        decision = []
-
         tensor_rgb = self.numpy_to_tensor(image)
         if np.random.random() < self.gamma:
-            result = self.get_colour_centers(image, self.settings)
-            for colour in result:
-                decision.append(result[colour][0])
-                decision.append(result[colour][1])
+            self.result = self.get_colour_centers(image, self.settings)
+            self.decision = []
+            for colour in self.result:
+                self.decision.append(self.result[colour][0])
+                self.decision.append(self.result[colour][1])
                 
             tensor_rgb = self.numpy_to_tensor(image)
-            self.train_model(tensor_rgb, decision)
+            self.train_model(tensor_rgb, self.decision)
         else:
             predection = self.predict(tensor_rgb)
-            decision = predection
+            self.decision = predection
+
+            for i in range(len(decision)):
+                self.result[self.colours[i]] = decision[2*i]
+                self.result[self.colours[i]] = decision[2*i+1]
+
         tensor_rgb.detach()
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
-        self.gamma = self.gamma*(1-self.epsilion)
+        self.gamma = 10 #self.gamma*(1-self.epsilion)
 
         if self.DEVICE == "cuda":
             torch.cuda.empty_cache()
 
-        return (decision, result)
+        return (self.decision, self.result)
 
     def predict(self, tensor_rgb):
         with torch.no_grad():
@@ -160,3 +167,4 @@ class BoxFollower():
         tensor_rgb = tensor_rgb / 255.0
         tensor_rgb = tensor_rgb.unsqueeze(0)
         return tensor_rgb
+
