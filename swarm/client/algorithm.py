@@ -124,7 +124,7 @@ class BoxFollower():
 
         tensor_rgb.detach()
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
-        self.gamma = 10 #self.gamma*(1-self.epsilion)
+        self.gamma = self.gamma*(1-self.epsilion)
 
         if self.DEVICE == "cuda":
             torch.cuda.empty_cache()
