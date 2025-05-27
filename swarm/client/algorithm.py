@@ -88,7 +88,7 @@ class BoxFollower():
             bounds = self.get_bounds_from_setting(setting)
             colour_name = setting["colour"]
 
-            center_norm_x, center_norm_y, found = self.find_color_center(frame, bounds, min_area=100)
+            center_norm_x, center_norm_y, found = self.find_color_center(frame, bounds, min_area=50)
 
             state[colour_name] = (center_norm_x, center_norm_y)
 
