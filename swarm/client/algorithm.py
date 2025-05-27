@@ -100,10 +100,11 @@ class BoxFollower():
 
     def step(self, image) -> (float, float):
         if image is None:
-            return (0, 0)
+            return (0, 0, "None")
 
         tensor_rgb = self.numpy_to_tensor(image)
         if np.random.random() < self.gamma:
+            method = "Algorithm"
             self.result = self.get_colour_centers(image, self.settings)
             self.decision = []
             for colour in self.result:
@@ -113,12 +114,13 @@ class BoxFollower():
             tensor_rgb = self.numpy_to_tensor(image)
             self.train_model(tensor_rgb, self.decision)
         else:
+            method = "Model"
             predection = self.predict(tensor_rgb)
             self.decision = predection
 
-            for i in range(len(decision)):
-                self.result[self.colours[i]] = decision[2*i]
-                self.result[self.colours[i]] = decision[2*i+1]
+            for i in range(len(self.decision)):
+                self.result[self.colours[i]] = self.decision[2*i]
+                self.result[self.colours[i]] = self.decision[2*i+1]
 
         tensor_rgb.detach()
         # img_data_list.append((CAMRGB, self.forward_speed, self.turn_speed))
@@ -127,7 +129,7 @@ class BoxFollower():
         if self.DEVICE == "cuda":
             torch.cuda.empty_cache()
 
-        return (self.decision, self.result)
+        return (self.decision, self.result, method)
 
     def predict(self, tensor_rgb):
         with torch.no_grad():
