@@ -154,6 +154,7 @@ class BoxFollower():
         preprocess_rgb = self.preprocess(tensor_rgb)
         predection = self.model(preprocess_rgb)
         target = torch.tensor(target, dtype=torch.float, device=self.DEVICE)
+        target = target.squeeze(0)
         output = self.loss(predection, target)
         output.backward()
         self.optimizer.step()
